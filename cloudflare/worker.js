@@ -10,6 +10,7 @@ function jsonResponse(data, status = 200) {
     status,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
+      'X-Worker-Version': WORKER_VERSION,
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type'
@@ -45,18 +46,13 @@ function isTrackCodePath(pathname) {
 
 function isSpaPagePath(pathname) {
   if (pathname === '/' || pathname === '') return true
-  return /^\/(_config|_query|config|query)(\/|$)/i.test(pathname)
+  return /^\/(?:_config|_query)(\/|$)/i.test(pathname)
 }
 
 function extractVisitorIdFromUrlString(urlString) {
   if (!urlString) return ''
   try {
     const url = new URL(String(urlString))
-    const queryCode = (url.searchParams.get('t') || '').trim()
-    if (queryCode) {
-      return decodeURIComponent(queryCode)
-    }
-
     const pathParts = url.pathname.split('/').filter(Boolean)
     const first = (pathParts[0] || '').trim()
     const second = (pathParts[1] || '').trim()
@@ -141,6 +137,7 @@ export default {
       return new Response(null, {
         status: 204,
         headers: {
+          'X-Worker-Version': WORKER_VERSION,
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type'
@@ -250,15 +247,23 @@ export default {
 
       if (request.method === 'GET' && isExtensionlessPath) {
         if (isSpaPagePath(pathname)) {
-          const fallbackRequest = new Request(new URL('/index.html', request.url), request)
-          return env.ASSETS.fetch(fallbackRequest)
+          const fallbackRequest = new Request(new URL('/', request.url), request)
+          const fallbackResponse = await env.ASSETS.fetch(fallbackRequest)
+          const headers = new Headers(fallbackResponse.headers)
+          headers.set('X-Worker-Version', WORKER_VERSION)
+          return new Response(fallbackResponse.body, {
+            status: fallbackResponse.status,
+            statusText: fallbackResponse.statusText,
+            headers
+          })
         }
 
         const visitorIdFromPath = extractVisitorIdFromPathname(pathname)
         if (visitorIdFromPath && isTrackCodePath(pathname)) {
-          const fallbackRequest = new Request(new URL('/index.html', request.url), request)
+          const fallbackRequest = new Request(new URL('/', request.url), request)
           const fallbackResponse = await env.ASSETS.fetch(fallbackRequest)
           const headers = new Headers(fallbackResponse.headers)
+          headers.set('X-Worker-Version', WORKER_VERSION)
           const secure = url.protocol === 'https:' ? '; Secure' : ''
           headers.append(
             'Set-Cookie',
@@ -271,8 +276,15 @@ export default {
           })
         }
 
-        const fallbackRequest = new Request(new URL('/index.html', request.url), request)
-        return env.ASSETS.fetch(fallbackRequest)
+        const fallbackRequest = new Request(new URL('/', request.url), request)
+        const fallbackResponse = await env.ASSETS.fetch(fallbackRequest)
+        const headers = new Headers(fallbackResponse.headers)
+        headers.set('X-Worker-Version', WORKER_VERSION)
+        return new Response(fallbackResponse.body, {
+          status: fallbackResponse.status,
+          statusText: fallbackResponse.statusText,
+          headers
+        })
       }
 
       const assetResponse = await env.ASSETS.fetch(request)
@@ -280,8 +292,15 @@ export default {
         return assetResponse
       }
 
-      const fallbackRequest = new Request(new URL('/index.html', request.url), request)
-      return env.ASSETS.fetch(fallbackRequest)
+      const fallbackRequest = new Request(new URL('/', request.url), request)
+      const fallbackResponse = await env.ASSETS.fetch(fallbackRequest)
+      const headers = new Headers(fallbackResponse.headers)
+      headers.set('X-Worker-Version', WORKER_VERSION)
+      return new Response(fallbackResponse.body, {
+        status: fallbackResponse.status,
+        statusText: fallbackResponse.statusText,
+        headers
+      })
     }
 
     return new Response('Static assets not configured. Build frontend and set [assets].directory to dist.', { status: 500 })

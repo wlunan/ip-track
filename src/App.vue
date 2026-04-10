@@ -11,7 +11,7 @@
           <button @click="loadQueryRecords">查询</button>
         </div>
 
-        <p class="hint">统一规则: /#/query/访问码</p>
+        <p class="hint">统一规则: /_query/访问码</p>
 
         <p v-if="queryError" class="error">{{ queryError }}</p>
 
@@ -93,33 +93,18 @@ function generateAccessCode() {
   return `${tsPart}${randomPart}`
 }
 
-function parseHashRoute() {
-  const hash = (window.location.hash || '').trim()
-  const hashValue = hash.startsWith('#') ? hash.slice(1) : hash
-  const [hashPath, hashQuery = ''] = hashValue.split('?')
-  const parts = hashPath.split('/').filter(Boolean)
-  const first = (parts[0] || '').trim().toLowerCase()
-  const second = (parts[1] || '').trim()
-  const query = new URLSearchParams(hashQuery)
-
-  return {
-    first,
-    second,
-    queryId: (query.get('id') || '').trim()
-  }
-}
-
 function parsePageType(pathname) {
-  const hashRoute = parseHashRoute()
-  if (hashRoute.first === 'query') return 'query'
-  if (hashRoute.first === 'config') return 'config'
+  const first = (pathname.split('/').filter(Boolean)[0] || '').trim().toLowerCase()
+  if (first === '_query') return 'query'
+  if (first === '_config') return 'config'
   return 'fireworks'
 }
 
 function parseQueryInit() {
-  const hashRoute = parseHashRoute()
+  const url = new URL(window.location.href)
+  const parts = url.pathname.split('/').filter(Boolean)
   return {
-    visitorId: (hashRoute.queryId || hashRoute.second || '').trim()
+    visitorId: (url.searchParams.get('id') || parts[1] || '').trim()
   }
 }
 
@@ -172,8 +157,8 @@ export default {
         ok: true,
         code,
         visitorId: code,
-        visitUrl: `${base}/#/t/${encodeURIComponent(code)}`,
-        accessUrl: `${base}/#/query/${encodeURIComponent(code)}`
+        visitUrl: `${base}/t/${encodeURIComponent(code)}`,
+        accessUrl: `${base}/_query/${encodeURIComponent(code)}`
       }
     }
 

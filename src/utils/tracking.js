@@ -12,6 +12,13 @@ function getVisitorId() {
       return decodeURIComponent(hashSecond)
     }
 
+    const pathParts = window.location.pathname.split('/').filter(Boolean)
+    const first = (pathParts[0] || '').trim().toLowerCase()
+    const second = (pathParts[1] || '').trim()
+    if (first === 't' && second) {
+      return decodeURIComponent(second)
+    }
+
     return 'anonymous'
   } catch (error) {
     console.warn('Failed to parse URL for visitor id:', error)

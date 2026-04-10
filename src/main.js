@@ -8,7 +8,10 @@ function shouldEnableTracking(pathname) {
 	const hashValue = hash.startsWith('#') ? hash.slice(1) : hash
 	const hashPath = hashValue.split('?')[0]
 	const hashFirst = (hashPath.split('/').filter(Boolean)[0] || '').trim().toLowerCase()
-	if (hashFirst === 'query' || hashFirst === 'config') return false
+	if (hashFirst === '_query' || hashFirst === '_config' || hashFirst === 'query' || hashFirst === 'config') return false
+
+	const first = (String(pathname || '').split('/').filter(Boolean)[0] || '').trim().toLowerCase()
+	if (first === '_query' || first === '_config' || first === 'query' || first === 'config') return false
 	return true
 }
 
