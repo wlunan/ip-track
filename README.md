@@ -228,11 +228,14 @@ MIT License - 详见 LICENSE 文件
 
 - 同一个 Worker 托管页面静态资源（`dist`）
 - 同一个 Worker 提供埋点接口（`/api/track`）
+- 同一个 Worker 提供查询接口（`/api/query-records?id=访问码`）
 - D1 绑定名使用 `DB`
 - 静态资源绑定名使用 `ASSETS`
 - 前端默认固定上报到同域 `/api/track`
 - 仅在页面打开时记录一次（`page_view`）
-- 提供前端预览路径：`/_clock_view_9x2k7m?id=alice`
+- 支持访问码路径 `/:code`，会写入 cookie 后重定向到 `/`
+- 支持查询页面 `/query/:code` 与 `/query?id=:code`
+- 支持配置页面 `/config` 前端生成访问码（`36进制秒级时间戳 + 2位随机字符`）
 
 仓库关键文件：
 
@@ -281,15 +284,16 @@ wrangler d1 execute who_clicked_clock_db --remote --file=./cloudflare/schema.sql
 wrangler deploy
 ```
 
-7. 打开 Worker 域名访问页面，并使用 `/alice` 或 `/track/alice` 验证。
+7. 打开 Worker 域名访问页面，并使用 `/alice` 验证重定向与埋点。
 
 说明：当前单 Worker 模式不依赖 `VUE_APP_TRACKING_WORKER_URL`，避免旧环境变量把请求指向错误域名。
 
 #### 验证是否生效
 
-1. 打开：`https://your-clock.pages.dev/alice`（或 `/track/alice`）
+1. 打开：`https://your-clock.pages.dev/alice`
 2. 刷新页面后等待 1-2 秒
-3. 在 D1 查询：
+3. 打开：`https://your-clock.pages.dev/query/alice` 或 `https://your-clock.pages.dev/query?id=alice` 查看记录
+4. 在 D1 查询：
 
 ```sql
 SELECT visitor_id, ip_address, device_user_agent, visited_at, event_type
@@ -303,7 +307,7 @@ LIMIT 20;
 | 字段名 | 类型 | 说明 |
 |---|---|---|
 | `id` | INTEGER | 主键，自增 |
-| `visitor_id` | TEXT | 访问人标识，来自路径 `/xxx` 或 `/track/xxx` |
+| `visitor_id` | TEXT | 访问码（来自路径 `/xxx`） |
 | `event_type` | TEXT | 事件类型（当前默认记录 `page_view`） |
 | `ip_address` | TEXT | 访问 IP（Worker 从 Cloudflare 请求头提取） |
 | `device_user_agent` | TEXT | 设备/浏览器信息（User-Agent） |

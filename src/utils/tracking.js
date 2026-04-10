@@ -1,25 +1,18 @@
 const DEFAULT_EVENT_VERSION = 1
-
 function getVisitorId() {
   try {
-    const url = new URL(window.location.href)
-    const pathParts = url.pathname.split('/').filter(Boolean)
-    const first = (pathParts[0] || '').trim()
-    const second = (pathParts[1] || '').trim()
+    const hash = (window.location.hash || '').trim()
+    const hashValue = hash.startsWith('#') ? hash.slice(1) : hash
+    const hashPath = hashValue.split('?')[0]
+    const hashParts = hashPath.split('/').filter(Boolean)
+    const hashFirst = (hashParts[0] || '').trim().toLowerCase()
+    const hashSecond = (hashParts[1] || '').trim()
 
-    // Preferred route style: /track/:id
-    if (first === 'track' && second) {
-      return decodeURIComponent(second)
+    if (hashFirst === 't' && hashSecond) {
+      return decodeURIComponent(hashSecond)
     }
 
-    // Also support simple style: /:id
-    if (first && !first.startsWith('_')) {
-      return decodeURIComponent(first)
-    }
-
-    // Backward compatible fallback for old links: ?id=xxx
-    const queryId = (url.searchParams.get('id') || '').trim()
-    return queryId || 'anonymous'
+    return 'anonymous'
   } catch (error) {
     console.warn('Failed to parse URL for visitor id:', error)
     return 'anonymous'
@@ -72,6 +65,9 @@ export function initTracking({ endpoint = '' } = {}) {
   }
 
   const visitorId = getVisitorId()
+  if (!visitorId || visitorId === 'anonymous') {
+    return
+  }
 
   const sendEvent = (eventType, extra = {}) => {
     const payload = {
