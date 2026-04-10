@@ -1,0 +1,12 @@
+name = "who-clicked-clock"
+main = "cloudflare/worker.js"
+compatibility_date = "2026-04-09"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "who_clicked_clock_db"
+database_id = "fad441be-e1f7-4808-aebb-ba764deffb43"
