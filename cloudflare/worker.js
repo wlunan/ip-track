@@ -156,7 +156,7 @@ export default {
       }
 
       const result = await env.DB.prepare(
-        `SELECT event_type, ip_address, country, city, visited_at, url
+        `SELECT event_type, ip_address, country, city, visited_at, url, device_user_agent
          FROM click_events
          WHERE visitor_id = ?
          ORDER BY id DESC

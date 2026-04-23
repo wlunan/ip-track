@@ -7,43 +7,43 @@
 
       <template v-if="pageType === 'query'">
         <div class="form-row">
-          <input v-model.trim="queryVisitorId" placeholder="输入访问码（即 visitor_id），例如 kf2a91q8" />
+          <input
+            v-model.trim="queryVisitorId"
+            placeholder="输入访问码（visitor_id），例如 kf2a91q8"
+          />
           <button @click="loadQueryRecords">查询</button>
         </div>
 
-        <p class="hint">统一规则: /_query/访问码</p>
+        <p class="hint">规则：`/_query/访问码`</p>
 
         <p v-if="queryError" class="error">{{ queryError }}</p>
 
         <div v-if="queryResult" class="meta">
-          <strong>visitor_id:</strong> {{ queryResult.visitorId }}
+          <strong>访问码：</strong>{{ queryResult.visitorId }}
           <span class="meta-gap"></span>
-          <strong>记录数:</strong> {{ queryResult.records.length }}
+          <strong>记录数：</strong>{{ displayRecords.length }}
         </div>
 
         <div class="table-wrap" v-if="queryResult">
           <table>
             <thead>
               <tr>
-                <th>event_type</th>
-                <th>ip_address</th>
-                <th>country</th>
-                <th>city</th>
-                <th>visited_at</th>
-                <th>url</th>
+                <th v-for="column in queryColumns" :key="column.key">{{ column.label }}</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-if="!queryResult.records.length">
-                <td colspan="6">暂无数据</td>
+              <tr v-if="!displayRecords.length">
+                <td :colspan="queryColumns.length">暂无数据</td>
               </tr>
-              <tr v-for="(row, index) in queryResult.records" :key="index">
-                <td>{{ row.event_type }}</td>
-                <td>{{ row.ip_address }}</td>
-                <td>{{ row.country }}</td>
-                <td>{{ row.city }}</td>
-                <td>{{ row.visited_at }}</td>
-                <td class="url-cell">{{ row.url }}</td>
+              <tr v-for="(row, index) in displayRecords" :key="index">
+                <td
+                  v-for="column in queryColumns"
+                  :key="column.key"
+                  :data-label="column.label"
+                  :class="{ 'url-cell': column.key === 'url', 'ua-cell': column.key === 'deviceInfo' }"
+                >
+                  {{ row[column.key] || '-' }}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -59,12 +59,21 @@
 
         <div v-if="createdConfig" class="result-box">
           <p><strong>visitor_id:</strong> {{ createdConfig.visitorId }}</p>
-          <p><strong>访问码:</strong> {{ createdConfig.code }}</p>
-          <p><strong>访问烟花页:</strong> <a :href="createdConfig.visitUrl">{{ createdConfig.visitUrl }}</a></p>
-          <p><strong>查询链接:</strong> <a :href="createdConfig.accessUrl">{{ createdConfig.accessUrl }}</a></p>
+          <p><strong>访问码：</strong> {{ createdConfig.code }}</p>
+          <p class="result-link-row">
+            <strong>访问烟花页：</strong>
+            <a :href="createdConfig.visitUrl">{{ createdConfig.visitUrl }}</a>
+            <button class="copy-btn" @click="copyText(createdConfig.visitUrl)">复制</button>
+          </p>
+          <p class="result-link-row">
+            <strong>查询链接：</strong>
+            <a :href="createdConfig.accessUrl">{{ createdConfig.accessUrl }}</a>
+            <button class="copy-btn" @click="copyText(createdConfig.accessUrl)">复制</button>
+          </p>
+          <p v-if="copySuccessText" class="copy-success">{{ copySuccessText }}</p>
         </div>
 
-        <p class="hint">访问码规则: 6-7位36进制秒级时间戳 + 2位随机数（小写字母和数字）。</p>
+        <p class="hint">访问码规则：6-7 位 base36 秒级时间戳 + 2 位随机字符。</p>
       </template>
     </div>
   </div>
@@ -73,6 +82,25 @@
 <script>
 import { computed, onMounted, ref } from 'vue'
 import FireworksScene from './components/FireworksScene.vue'
+
+const queryColumns = [
+  { key: 'eventType', label: '事件类型' },
+  { key: 'ipAddress', label: 'IP 地址' },
+  { key: 'country', label: '国家/地区' },
+  { key: 'city', label: '城市' },
+  { key: 'visitedAt', label: '访问时间' },
+  { key: 'deviceInfo', label: '设备/浏览器' },
+  { key: 'url', label: '访问链接' }
+]
+
+const cityZhMap = {
+  Nanjing: '南京',
+  'Santa Clara': '圣克拉拉'
+}
+
+const regionNameZh = typeof Intl.DisplayNames === 'function'
+  ? new Intl.DisplayNames(['zh-Hans', 'zh-CN'], { type: 'region' })
+  : null
 
 function toBase36(value) {
   return Math.max(0, Number(value) || 0).toString(36)
@@ -108,9 +136,68 @@ function parseQueryInit() {
   }
 }
 
+function getCountryZh(value) {
+  const code = String(value || '').trim().toUpperCase()
+  if (!code) return '-'
+  if (!regionNameZh || code.length !== 2) return code
+  return regionNameZh.of(code) || code
+}
+
+function getCityZh(value) {
+  const city = String(value || '').trim()
+  if (!city) return '-'
+  return cityZhMap[city] || city
+}
+
+function parseUserAgent(ua) {
+  const text = String(ua || '')
+  if (!text) {
+    return '未知设备'
+  }
+
+  let browser = '其他浏览器'
+  if (/Edg\//i.test(text)) browser = 'Edge'
+  else if (/OPR\//i.test(text)) browser = 'Opera'
+  else if (/Firefox\//i.test(text)) browser = 'Firefox'
+  else if (/Chrome\//i.test(text)) browser = 'Chrome'
+  else if (/Safari\//i.test(text) && !/Chrome\//i.test(text)) browser = 'Safari'
+  else if (/MSIE|Trident\//i.test(text)) browser = 'IE'
+
+  let os = '未知系统'
+  if (/Android/i.test(text)) os = 'Android'
+  else if (/iPhone|iPad|iPod/i.test(text)) os = 'iOS'
+  else if (/Windows/i.test(text)) os = 'Windows'
+  else if (/Mac OS X|Macintosh/i.test(text)) os = 'macOS'
+  else if (/Linux/i.test(text)) os = 'Linux'
+
+  let device = '桌面'
+  if (/iPad|Tablet|PlayBook|Silk/i.test(text)) device = '平板'
+  else if (/Mobile|Android|iPhone|iPod/i.test(text)) device = '手机'
+
+  return `${device} / ${os} · ${browser}`
+}
+
+async function writeClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+
+  const input = document.createElement('textarea')
+  input.value = text
+  input.setAttribute('readonly', '')
+  input.style.position = 'fixed'
+  input.style.opacity = '0'
+  input.style.pointerEvents = 'none'
+  document.body.appendChild(input)
+  input.select()
+  document.execCommand('copy')
+  document.body.removeChild(input)
+}
+
 export default {
   components: { FireworksScene },
-  setup () {
+  setup() {
     const pageType = ref(parsePageType(window.location.pathname))
     const pageTitle = computed(() => (pageType.value === 'query' ? '访问信息查询' : '访问码配置'))
 
@@ -121,6 +208,21 @@ export default {
 
     const createdConfig = ref(null)
     const configError = ref('')
+    const copySuccessText = ref('')
+    let copyTimer = 0
+
+    const displayRecords = computed(() => {
+      const rows = queryResult.value?.records || []
+      return rows.map((row) => ({
+        eventType: row.event_type || '-',
+        ipAddress: row.ip_address || '-',
+        country: getCountryZh(row.country),
+        city: getCityZh(row.city),
+        visitedAt: row.visited_at || '-',
+        deviceInfo: parseUserAgent(row.device_user_agent),
+        url: row.url || '-'
+      }))
+    })
 
     const loadQueryRecords = async () => {
       queryError.value = ''
@@ -150,6 +252,7 @@ export default {
     const createAccessCode = async () => {
       configError.value = ''
       createdConfig.value = null
+      copySuccessText.value = ''
 
       const code = generateAccessCode()
       const base = window.location.origin
@@ -160,6 +263,22 @@ export default {
         visitUrl: `${base}/t/${encodeURIComponent(code)}`,
         accessUrl: `${base}/_query/${encodeURIComponent(code)}`
       }
+    }
+
+    const copyText = async (text) => {
+      try {
+        await writeClipboard(text)
+        copySuccessText.value = '链接已复制'
+      } catch (error) {
+        copySuccessText.value = '复制失败，请手动复制'
+      }
+
+      if (copyTimer) {
+        clearTimeout(copyTimer)
+      }
+      copyTimer = setTimeout(() => {
+        copySuccessText.value = ''
+      }, 1800)
     }
 
     onMounted(() => {
@@ -176,14 +295,22 @@ export default {
       queryError,
       createdConfig,
       configError,
+      copySuccessText,
+      queryColumns,
+      displayRecords,
       loadQueryRecords,
-      createAccessCode
+      createAccessCode,
+      copyText
     }
   }
 }
 </script>
 
 <style lang="less">
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   font-family: 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
@@ -231,6 +358,7 @@ body {
   background: #2b77ff;
   color: #fff;
   cursor: pointer;
+  font-size: 14px;
 }
 
 .hint {
@@ -246,6 +374,7 @@ body {
 .meta {
   font-size: 14px;
   margin: 12px 0;
+  word-break: break-all;
 }
 
 .meta-gap {
@@ -277,8 +406,9 @@ th {
   background: #f7faff;
 }
 
-.url-cell {
-  min-width: 280px;
+.url-cell,
+.ua-cell {
+  min-width: 220px;
   word-break: break-all;
 }
 
@@ -294,6 +424,45 @@ th {
   margin: 6px 0;
 }
 
+.result-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.result-link-row a {
+  word-break: break-all;
+  color: #134dbd;
+}
+
+.copy-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #0f6ddf;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.copy-success {
+  color: #0f6a32;
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+@media (max-width: 860px) {
+  .tool-page {
+    padding: 14px;
+  }
+
+  .tool-card {
+    padding: 16px;
+    border-radius: 14px;
+  }
+}
+
 @media (max-width: 680px) {
   .tool-page {
     padding: 12px;
@@ -301,6 +470,99 @@ th {
 
   .tool-card {
     padding: 14px;
+  }
+
+  .form-row {
+    flex-direction: column;
+  }
+
+  .form-row input,
+  .form-row button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .meta-gap {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .table-wrap {
+    border: none;
+    overflow: visible;
+  }
+
+  table,
+  thead,
+  tbody,
+  tr,
+  th,
+  td {
+    display: block;
+    width: 100%;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody tr {
+    background: #f7faff;
+    border: 1px solid #dbe6ff;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+  }
+
+  tbody tr td {
+    border-bottom: 1px dashed #d5dfef;
+    padding: 8px 0;
+    position: relative;
+    padding-left: 44%;
+    min-height: 30px;
+    word-break: break-word;
+  }
+
+  tbody tr td:last-child {
+    border-bottom: none;
+  }
+
+  tbody tr td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 42%;
+    font-weight: 600;
+    color: #43506a;
+    text-transform: none;
+  }
+
+  tbody tr td[colspan] {
+    padding-left: 0;
+    text-align: center;
+  }
+
+  tbody tr td[colspan]::before {
+    display: none;
+  }
+
+  .url-cell,
+  .ua-cell {
+    min-width: 0;
+  }
+
+  .result-link-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .copy-btn {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
   }
 }
 </style>

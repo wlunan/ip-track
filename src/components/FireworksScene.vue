@@ -123,7 +123,7 @@ export default {
       x,
       y: height + 20,
       vx: (Math.random() - 0.5) * spread,
-      vy: -7.6 - Math.random() * 1.6,
+      vy: -6 - Math.random() * 1.2,
       targetY,
       type,
       hue: Math.random() * 360,
@@ -234,14 +234,14 @@ export default {
 
     const spawnAuto = (timestamp) => {
       if (!autoPlay.value) return
-      if (timestamp - lastAuto < 720) return
+      if (timestamp - lastAuto < 1350) return
       lastAuto = timestamp
 
       const x = width * (0.12 + Math.random() * 0.76)
       const targetY = height * (0.2 + Math.random() * 0.45)
       rockets.push(makeRocket(x, targetY, pickType()))
 
-      if (Math.random() > 0.68) {
+      if (Math.random() > 0.85) {
         rockets.push(makeRocket(x + (Math.random() - 0.5) * 90, targetY + Math.random() * 40, pickType(), 0.9))
       }
     }
@@ -263,7 +263,7 @@ export default {
         r.life += 1
         r.x += r.vx
         r.y += r.vy
-        r.vy += 0.03
+        r.vy += 0.022
 
         ctx.beginPath()
         ctx.arc(r.x, r.y, 1.8, 0, Math.PI * 2)
@@ -333,11 +333,11 @@ export default {
     const onSceneClick = (event) => {
       const baseX = event.clientX
       const baseY = event.clientY
-      launchBurst(baseX, Math.max(64, baseY - 30), 3)
+      launchBurst(baseX, Math.max(64, baseY - 30), 2)
     }
 
     const launchNow = () => {
-      launchBurst(width * (0.2 + Math.random() * 0.6), height * (0.24 + Math.random() * 0.25), 4)
+      launchBurst(width * (0.2 + Math.random() * 0.6), height * (0.24 + Math.random() * 0.25), 2)
     }
 
     const switchLocaleFn = (newLocale) => {
