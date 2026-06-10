@@ -118,14 +118,41 @@ function pickFirstIp(value) {
   return String(value).split(',')[0].trim()
 }
 
+/**
+ * 将IPv6-mapped IPv4地址转换为纯IPv4地址
+ * 例如: ::ffff:192.168.1.1 → 192.168.1.1
+ * 对于纯IPv6地址，返回原地址
+ */
+function normalizeIp(ip) {
+  if (!ip) return ''
+  const trimmed = String(ip).trim()
+  
+  // 处理IPv6-mapped IPv4地址 (RFC 4291)
+  const ipv6MappedPrefixes = ['::ffff:', '0:0:0:0:0:ffff:', '::FFFF:', '0:0:0:0:0:FFFF:']
+  for (const prefix of ipv6MappedPrefixes) {
+    if (trimmed.toLowerCase().startsWith(prefix.toLowerCase())) {
+      return trimmed.slice(prefix.length)
+    }
+  }
+  
+  // 处理IPv4-mapped IPv6地址的其他格式
+  const mappedMatch = trimmed.match(/^::(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i)
+  if (mappedMatch) {
+    return mappedMatch[1]
+  }
+  
+  return trimmed
+}
+
 function getClientIp(request) {
-  return (
+  const rawIp = (
     request.headers.get('CF-Connecting-IP') ||
     request.headers.get('True-Client-IP') ||
     request.headers.get('X-Real-IP') ||
     pickFirstIp(request.headers.get('X-Forwarded-For')) ||
     ''
   )
+  return normalizeIp(rawIp)
 }
 
 export default {
@@ -156,7 +183,7 @@ export default {
       }
 
       const result = await env.DB.prepare(
-        `SELECT event_type, ip_address, country, city, visited_at, url, device_user_agent
+        `SELECT event_type, ip_address, client_ipv4, client_ipv6, client_city, country, city, visited_at, url, device_user_agent
          FROM click_events
          WHERE visitor_id = ?
          ORDER BY id DESC
@@ -189,6 +216,9 @@ export default {
       const visitorId = resolveVisitorId(payload, request)
       const eventType = String(payload.eventType || '').trim() || 'unknown'
       const ipAddress = getClientIp(request)
+      const clientIpv4 = String(payload.clientIpv4 || '').trim()
+      const clientIpv6 = String(payload.clientIpv6 || '').trim()
+      const clientCity = String(payload.clientCity || '').trim()
       const deviceUserAgent =
         String(payload.userAgent || '').trim() ||
         request.headers.get('User-Agent') ||
@@ -212,17 +242,23 @@ export default {
             visitor_id,
             event_type,
             ip_address,
+            client_ipv4,
+            client_ipv6,
+            client_city,
             device_user_agent,
             country,
             city,
             visited_at,
             url
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
           .bind(
             visitorId,
             eventType,
             ipAddress,
+            clientIpv4,
+            clientIpv6,
+            clientCity,
             deviceUserAgent,
             country,
             city,

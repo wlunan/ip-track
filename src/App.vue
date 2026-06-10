@@ -42,12 +42,29 @@
                   :data-label="column.label"
                   :class="{ 'url-cell': column.key === 'url', 'ua-cell': column.key === 'deviceInfo' }"
                 >
-                  {{ row[column.key] || '-' }}
+                  <template v-if="(column.key === 'clientIpv4' || column.key === 'clientIpv6') && row[column.key] && row[column.key] !== '-'">
+                    <span class="ip-cell">
+                      <span class="ip-text">{{ row[column.key] }}</span>
+                      <button class="ip-action-btn copy-icon-btn" @click="copyText(row[column.key])" title="复制IP">📋</button>
+                      <a
+                        class="ip-action-btn query-link"
+                        :href="`https://ipinfo.io/${row[column.key]}`"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="查看IP详情"
+                      >🔍</a>
+                    </span>
+                  </template>
+                  <template v-else>
+                    {{ row[column.key] || '-' }}
+                  </template>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+
+        <p v-if="copySuccessText" class="copy-success">{{ copySuccessText }}</p>
       </template>
 
       <template v-if="pageType === 'config'">
@@ -85,9 +102,10 @@ import FireworksScene from './components/FireworksScene.vue'
 
 const queryColumns = [
   { key: 'eventType', label: '事件类型' },
-  { key: 'ipAddress', label: 'IP 地址' },
+  { key: 'clientIpv4', label: 'IPv4 地址' },
+  { key: 'clientIpv6', label: 'IPv6 地址' },
+  { key: 'clientCity', label: '城市（IPv4）' },
   { key: 'country', label: '国家/地区' },
-  { key: 'city', label: '城市' },
   { key: 'visitedAt', label: '访问时间' },
   { key: 'deviceInfo', label: '设备/浏览器' },
   { key: 'url', label: '访问链接' }
@@ -213,15 +231,19 @@ export default {
 
     const displayRecords = computed(() => {
       const rows = queryResult.value?.records || []
-      return rows.map((row) => ({
-        eventType: row.event_type || '-',
-        ipAddress: row.ip_address || '-',
-        country: getCountryZh(row.country),
-        city: getCityZh(row.city),
-        visitedAt: row.visited_at || '-',
-        deviceInfo: parseUserAgent(row.device_user_agent),
-        url: row.url || '-'
-      }))
+      return rows.map((row) => {
+        const ipv6 = row.client_ipv6 || ''
+        return {
+          eventType: row.event_type || '-',
+          clientIpv4: row.client_ipv4 || '-',
+          clientIpv6: ipv6 ? ipv6.slice(0, 20) + (ipv6.length > 20 ? '...' : '') : '-',
+          clientCity: row.client_city || '-',
+          country: getCountryZh(row.country),
+          visitedAt: row.visited_at || '-',
+          deviceInfo: parseUserAgent(row.device_user_agent),
+          url: row.url || '-'
+        }
+      })
     })
 
     const loadQueryRecords = async () => {
@@ -268,7 +290,9 @@ export default {
     const copyText = async (text) => {
       try {
         await writeClipboard(text)
-        copySuccessText.value = '链接已复制'
+        // 检测是否为IP地址
+        const isIp = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(text)
+        copySuccessText.value = isIp ? 'IP已复制' : '链接已复制'
       } catch (error) {
         copySuccessText.value = '复制失败，请手动复制'
       }
@@ -446,6 +470,41 @@ th {
   font-size: 12px;
 }
 
+.ip-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ip-text {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+}
+
+.ip-action-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 12px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  text-decoration: none;
+}
+
+.ip-action-btn:hover {
+  opacity: 1;
+}
+
+.copy-icon-btn {
+  border-radius: 4px;
+}
+
+.query-link {
+  border-radius: 4px;
+  color: #2b77ff;
+}
+
 .copy-success {
   color: #0f6a32;
   font-size: 13px;
@@ -551,6 +610,10 @@ th {
   .url-cell,
   .ua-cell {
     min-width: 0;
+  }
+
+  .ip-cell {
+    flex-wrap: wrap;
   }
 
   .result-link-row {
