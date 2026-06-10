@@ -68,7 +68,7 @@ function buildBasePayload(visitorId) {
  * 通过 ip.sb API 获取客户端公网 IPv4/IPv6 地址
  * 使用 AbortSignal.timeout 控制超时，避免阻塞页面
  */
-async function fetchClientIps() {
+async function fetchClientIps(workerEndpoint) {
   const results = { ipv4: '', ipv6: '', city: '' }
   const tasks = [
     fetch('https://api-ipv4.ip.sb/ip', { signal: AbortSignal.timeout(3000) })
@@ -81,13 +81,16 @@ async function fetchClientIps() {
       .catch(() => {})
   ]
   await Promise.allSettled(tasks)
-  // 获取 IPv4 后，查询城市信息（使用 ip.sb 地理位置 API）
-  if (results.ipv4) {
+  await Promise.allSettled(tasks)
+  // 获取 IPv4 后，通过 Worker 代理查询城市信息
+  if (results.ipv4 && workerEndpoint) {
     try {
-      const res = await fetch(`https://api.ip.sb/geoip/${results.ipv4}`, { signal: AbortSignal.timeout(3000) })
-      const geo = await res.json()
-      if (geo.city) results.city = geo.city
-    } catch (_) {}
+      // workerEndpoint 是 /api/track，需要替换为 /api/geo
+      const geoUrl = workerEndpoint.replace(/\/api\/track$/, '/api/geo') + '?ip=' + results.ipv4
+      const res = await fetch(geoUrl, { signal: AbortSignal.timeout(5000) })
+      const json = await res.json()
+      if (json.ok && json.city) results.city = json.city
+    } catch (err) {}
   }
   return results
 }
@@ -105,7 +108,7 @@ export function initTracking({ endpoint = '' } = {}) {
   }
 
   const sendEvent = async (eventType, extra = {}) => {
-    const ips = await fetchClientIps()
+    const ips = await fetchClientIps(workerEndpoint)
     const payload = {
       ...buildBasePayload(visitorId),
       eventType,

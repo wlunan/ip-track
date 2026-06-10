@@ -42,13 +42,26 @@
                   :data-label="column.label"
                   :class="{ 'url-cell': column.key === 'url', 'ua-cell': column.key === 'deviceInfo' }"
                 >
-                  <template v-if="(column.key === 'clientIpv4' || column.key === 'clientIpv6') && row[column.key] && row[column.key] !== '-'">
+                  <template v-if="column.key === 'clientIpv4' && row[column.key] && row[column.key] !== '-'">
                     <span class="ip-cell">
                       <span class="ip-text">{{ row[column.key] }}</span>
                       <button class="ip-action-btn copy-icon-btn" @click="copyText(row[column.key])" title="复制IP">📋</button>
                       <a
                         class="ip-action-btn query-link"
                         :href="`https://ipinfo.io/${row[column.key]}`"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="查看IP详情"
+                      >🔍</a>
+                    </span>
+                  </template>
+                  <template v-else-if="column.key === 'clientIpv6' && row.clientIpv6 && row.clientIpv6 !== '-'">
+                    <span class="ip-cell">
+                      <span class="ip-text">{{ row.clientIpv6Short }}</span>
+                      <button class="ip-action-btn copy-icon-btn" @click="copyText(row.clientIpv6)" title="复制IP">📋</button>
+                      <a
+                        class="ip-action-btn query-link"
+                        :href="`https://ipinfo.io/${row.clientIpv6}`"
                         target="_blank"
                         rel="noopener noreferrer"
                         title="查看IP详情"
@@ -91,6 +104,16 @@
         </div>
 
         <p class="hint">访问码规则：6-7 位 base36 秒级时间戳 + 2 位随机字符。</p>
+
+        <div class="usage-guide">
+          <h3>使用步骤</h3>
+          <ol>
+            <li>点击「生成访问码」获取专属访问码</li>
+            <li>将「访问烟花页」链接发送给对方</li>
+            <li>对方打开链接后，访问记录会自动记录</li>
+            <li>访问 <code>/_query/访问码</code> 查看访问记录</li>
+          </ol>
+        </div>
       </template>
     </div>
   </div>
@@ -236,7 +259,8 @@ export default {
         return {
           eventType: row.event_type || '-',
           clientIpv4: row.client_ipv4 || '-',
-          clientIpv6: ipv6 ? ipv6.slice(0, 20) + (ipv6.length > 20 ? '...' : '') : '-',
+          clientIpv6: ipv6 || '-',
+          clientIpv6Short: ipv6 ? ipv6.slice(0, 20) + (ipv6.length > 20 ? '...' : '') : '-',
           clientCity: row.client_city || '-',
           country: getCountryZh(row.country),
           visitedAt: row.visited_at || '-',
@@ -509,6 +533,43 @@ th {
   color: #0f6a32;
   font-size: 13px;
   margin-top: 10px;
+}
+
+.usage-guide {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f0f7ff;
+  border-radius: 10px;
+  border: 1px solid #c8ddf5;
+}
+
+.usage-guide h3 {
+  margin: 0 0 12px 0;
+  font-size: 15px;
+  color: #1a3a5c;
+}
+
+.usage-guide ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.usage-guide li {
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #2c4a6e;
+  line-height: 1.5;
+}
+
+.usage-guide li:last-child {
+  margin-bottom: 0;
+}
+
+.usage-guide code {
+  background: #dce8f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
 }
 
 @media (max-width: 860px) {

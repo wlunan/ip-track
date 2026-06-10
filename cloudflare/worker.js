@@ -201,6 +201,28 @@ export default {
       return jsonResponse({ ok: true, version: WORKER_VERSION })
     }
 
+    if (pathname === '/api/geo') {
+      const ip = String(url.searchParams.get('ip') || '').trim()
+      if (!ip) {
+        return jsonResponse({ ok: false, error: 'Missing ip' }, 400)
+      }
+      // 优先使用 ip9.com.cn
+      try {
+        const res = await fetch(`https://ip9.com.cn/get?ip=${ip}`)
+        const json = await res.json()
+        if (json.ret === 200 && json.data) {
+          return jsonResponse({ ok: true, source: 'ip9', city: json.data.city || '' })
+        }
+      } catch (_) {}
+      // 回退到 ip.sb
+      try {
+        const res = await fetch(`https://api.ip.sb/geoip/${ip}`)
+        const geo = await res.json()
+        return jsonResponse({ ok: true, source: 'ipsb', city: geo.city || '' })
+      } catch (_) {}
+      return jsonResponse({ ok: false, error: 'Geo lookup failed' }, 500)
+    }
+
     if (pathname === '/api/track') {
       if (request.method !== 'POST') {
         return jsonResponse({ ok: false, error: 'Method not allowed' }, 405)
